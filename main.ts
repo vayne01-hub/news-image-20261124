@@ -1,9 +1,12 @@
-// news-image-20261124 — v2 poster.
-// Same seven verified stories as v1, re-set for legibility: every headline
-// now runs at 4x on two lines (readable at ~300 px across), each deck cut to
-// one line, numbers still inside their own discs. Software rasterizer with a
-// hand-written 5x7 bitmap font; Node 22 stdlib only, no network, no
-// randomness, no clock: two runs write identical bytes.
+// news-image-20261124 — v3 poster.
+// Same seven verified stories as v2, same 4x two-line headlines. The decks
+// are two lines again (v1's detail restored: the levy rate, the chip-stock
+// drag, the casualty attribution), each line kept short of the pictogram
+// box so no deck ever touches an icon's baseline — v2's story-3 deck ran
+// into the tower icon's rule. Attribution fixed: civil defence is cited
+// only for the 11 wounded, not for the "second strike" framing. Software
+// rasterizer with a hand-written 5x7 bitmap font; Node 22 stdlib only, no
+// network, no randomness, no clock: two runs write identical bytes.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -177,12 +180,13 @@ function drawText(s: string, x: number, y: number, scale: number, c: RGB): void 
 // ---------------------------------------------------------------- stories
 // Seven stories, all verified in the v1 research log (AP, Reuters, WSJ,
 // BBC, CNN, Xinhua, The Hindu; two independent publishers each). Headlines
-// are the v1 headlines reflowed onto two lines — wording unchanged — and
-// each deck is the v1 deck trimmed to one line, facts intact.
+// are the v2 headlines, unchanged. Each deck is two short lines (max 60
+// chars each, so the text ends well clear of the pictogram box at x=896);
+// line 2 carries the detail v2's single line had to drop.
 type Story = {
   tag: string;
   headline: [string, string];
-  deck: string;
+  deck: [string, string];
   accent: RGB;
   icon: string;
 };
@@ -191,49 +195,70 @@ const STORIES: Story[] = [
   {
     tag: 'TRADE - WASHINGTON',
     headline: ['US PLANS NEW TARIFFS', 'ON CHINA AND EU'],
-    deck: 'USTR TO UNVEIL SUBSIDY PROBE OF 16 ECONOMIES IN DAYS.',
+    deck: [
+      'USTR TO RELEASE SUBSIDY PROBE OF 16 ECONOMIES IN DAYS.',
+      'DUTIES WOULD STACK ON EXISTING 10-12.5% LEVIES.',
+    ],
     accent: [178, 44, 36],
     icon: 'bars',
   },
   {
     tag: 'MARKETS - NEW YORK',
     headline: ['NVIDIA SLIDES 6% AS', 'HUANG RALLY FADES'],
-    deck: "LAWMAKERS QUESTION TRUMP'S ROLE IN THE CEO'S RETURN.",
+    deck: [
+      "LAWMAKERS QUESTION TRUMP'S ROLE IN THE CEO'S RETURN.",
+      'CHIP STOCKS DRAG MARKETS LOWER.',
+    ],
     accent: [36, 98, 58],
     icon: 'down',
   },
   {
     tag: 'MIDDLE EAST - RIYADH',
     headline: ['HOUTHI DRONE HITS RIYADH', 'TOWER, 11 HURT'],
-    deck: 'SECOND STRIKE ON THE PIF TOWER IN UNDER A WEEK, CIVIL DEFENCE SAYS.',
+    deck: [
+      'SECOND STRIKE ON THE PIF TOWER IN UNDER A WEEK.',
+      "SAUDI CIVIL DEFENCE: 11 WOUNDED IN TUESDAY'S ATTACK.",
+    ],
     accent: [150, 84, 22],
     icon: 'tower',
   },
   {
     tag: 'MIDDLE EAST - GAZA',
     headline: ['ISRAELI STRIKE KILLS', 'HAMAS SECURITY CHIEF'],
-    deck: 'NAEEM ABU NAHEL KILLED IN GAZA CITY; SEVEN DEAD.',
+    deck: [
+      'NAEEM ABU NAHEL KILLED IN GAZA CITY.',
+      'SEVEN DEAD AS CEASEFIRE STRAINS.',
+    ],
     accent: [90, 60, 120],
     icon: 'burst',
   },
   {
     tag: 'AMERICAS - CARTAGENA',
     headline: ['GUNMEN HOLD 30 HOSTAGE', 'IN CARTAGENA'],
-    deck: 'BOTCHED ARMOURED-TRUCK ROBBERY AT AN EXITO STORE.',
+    deck: [
+      'BOTCHED ARMOURED-TRUCK ROBBERY TURNS INTO DAY-LONG SIEGE.',
+      'FIVE HOSTAGES FREED DURING THE SIEGE.',
+    ],
     accent: [26, 92, 128],
     icon: 'store',
   },
   {
     tag: 'SPACE - JIUQUAN',
     headline: ['CHINA NAMES FIRST', 'PAKISTANI ASTRONAUT'],
-    deck: 'ALI JOINS SHENZHOU-24 CREW; FIRST FOREIGNER ABOARD TIANGONG.',
+    deck: [
+      'MUHAMMAD ZEESHAN ALI JOINS SHENZHOU-24 CREW.',
+      "FIRST FOREIGNER ABOARD CHINA'S SPACE STATION.",
+    ],
     accent: [30, 60, 140],
     icon: 'rocket',
   },
   {
     tag: 'ASIA - NEPAL',
     headline: ['5.6 QUAKE SHAKES NEPAL', 'NEAR TIBET'],
-    deck: 'TREMOR FELT IN INDIA, BHUTAN AND BANGLADESH; NO CASUALTIES.',
+    deck: [
+      'TREMOR FELT IN INDIA, BHUTAN AND BANGLADESH.',
+      'NO CASUALTIES REPORTED; EPICENTRE NEAR TIBET BORDER.',
+    ],
     accent: [120, 70, 40],
     icon: 'quake',
   },
@@ -348,23 +373,25 @@ function encodePng(): Buffer {
 }
 
 // ------------------------------------------------------------------ render
-// Row geometry (row height 118): tag at +10, headline lines at +30 and +62
-// (scale 4, 28 px glyphs), deck at +96 (scale 2). Number disc centred at
-// +59, clear of every glyph: the number sits inside its own circle and no
-// line or icon ever overlaps it.
+// Row geometry (row height 122): tag at +8, headline lines at +24 and +54
+// (scale 4, 28 px glyphs), deck lines at +86 and +102 (scale 2). Deck
+// lines are capped at 60 chars, so they end by x=840 — well clear of the
+// pictogram box at x=896. Number disc centred at +59, clear of every
+// glyph: the number sits inside its own circle and no line or icon ever
+// overlaps it. Header 132, rows 7x122 = 854, footer 38: 132+854+38 = 1024.
 function render(): void {
   fill(PAPER);
 
   // Header band.
-  rect(0, 0, W, 150, NAVY);
-  drawText('THE WORLD IN ONE DAY', 44, 24, 2, GOLD);
-  drawText('TUESDAY 24 NOVEMBER 2026', 44, 50, 6, WHITE);
-  drawText('SEVEN STORIES THAT DEFINED THE DAY', 44, 116, 2, GOLD);
-  rect(44, 138, 936, 3, GOLD);
+  rect(0, 0, W, 132, NAVY);
+  drawText('THE WORLD IN ONE DAY', 44, 16, 2, GOLD);
+  drawText('TUESDAY 24 NOVEMBER 2026', 44, 36, 6, WHITE);
+  drawText('SEVEN STORIES THAT DEFINED THE DAY', 44, 92, 2, GOLD);
+  rect(44, 114, 936, 3, GOLD);
 
   // Story rows.
-  const rowTop = 150;
-  const rowH = 118;
+  const rowTop = 132;
+  const rowH = 122;
   STORIES.forEach((s, i) => {
     const y = rowTop + i * rowH;
     if (i > 0) rect(44, y, 936, 2, RULE);
@@ -373,19 +400,20 @@ function render(): void {
     disc(74, cy, 30, s.accent);
     const num = String(i + 1);
     drawText(num, 74 - Math.floor(textWidth(num, 4) / 2), cy - 14, 4, WHITE);
-    // Tag, two-line headline, one-line deck.
-    drawText(s.tag, 122, y + 10, 2, s.accent);
-    drawText(s.headline[0], 122, y + 30, 4, INK);
-    drawText(s.headline[1], 122, y + 62, 4, INK);
-    drawText(s.deck, 122, y + 96, 2, GREY);
+    // Tag, two-line headline, two-line deck.
+    drawText(s.tag, 122, y + 8, 2, s.accent);
+    drawText(s.headline[0], 122, y + 24, 4, INK);
+    drawText(s.headline[1], 122, y + 54, 4, INK);
+    drawText(s.deck[0], 122, y + 86, 2, GREY);
+    drawText(s.deck[1], 122, y + 102, 2, GREY);
     // Pictogram, right side, inside its own box.
     drawIcon(s.icon, 896, y + 11, s.accent);
   });
 
   // Footer band.
-  rect(0, 976, W, 48, NAVY);
+  rect(0, 986, W, 38, NAVY);
   const foot = 'SOURCES: AP - REUTERS - WSJ - BBC - CNN - XINHUA - THE HINDU';
-  drawText(foot, Math.floor((W - textWidth(foot, 2)) / 2), 993, 2, WHITE);
+  drawText(foot, Math.floor((W - textWidth(foot, 2)) / 2), 1002, 2, WHITE);
 }
 
 // -------------------------------------------------------------------- main
